@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>HP Scanner ke Google Sheet</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body style="font-family:sans-serif; text-align:center; padding:20px; background:#f8f9fa;">
+  <h2>📷 Scanner Barcode / QR ke Google Sheet</h2>
+  <div id="reader" style="width:320px; margin:auto; border:2px solid #333; border-radius:10px;"></div>
+  <p id="status" style="margin-top:15px; font-weight:bold; color:green;">Siap scan...</p>
+
+  <!-- 🔊 Suara OK -->
+  <audio id="beepSound">
+    <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
+    <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    // 🔗 Ganti dengan URL Web App dari Google Apps Script
+    const sheetURL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
+    const beep = document.getElementById("beepSound");
+
+    function sendToSheet(code) {
+      fetch(sheetURL + "?kode=" + encodeURIComponent(code))
+        .then(r => r.text())
+        .then(res => {
+          document.getElementById("status").innerText = "✅ Data terkirim: " + code;
+          beep.play(); // 🔊 bunyi saat berhasil
+          // aktifkan lagi scanner setelah 2 detik
+          setTimeout(() => {
+            document.getElementById("status").innerText = "Siap scan lagi...";
+            html5QrcodeScanner.clear().then(() => {
+              html5QrcodeScanner.render(onScanSuccess);
+            });
+          }, 2000);
+        })
+        .catch(err => {
+          document.getElementById("status").innerText = "❌ Gagal kirim data!";
+        });
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+      // Stop sementara agar tidak double input
+      html5QrcodeScanner.clear();
+      sendToSheet(decodedText);
+    }
+
+    // Start scanner
+    let html5QrcodeScanner = new Html5QrcodeScanner(
+      "reader", { fps: 10, qrbox: 250 });
+    html5QrcodeScanner.render(onScanSuccess);
+  </script>
+</body>
+</html>
+
