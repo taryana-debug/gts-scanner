@@ -33,7 +33,7 @@
             html5QrcodeScanner.clear().then(() => {
               html5QrcodeScanner.render(onScanSuccess);
             });
-          }, 2000);
+          }, 500);
         })
         .catch(err => {
           document.getElementById("status").innerText = "❌ Gagal kirim data!";
@@ -53,4 +53,5 @@
   </script>
 </body>
 </html>
+
 
