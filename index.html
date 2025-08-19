@@ -7,7 +7,7 @@
 </head>
 <body style="font-family:sans-serif; text-align:center; padding:20px; background:#f8f9fa;">
   <h2>📷 Scanner Barcode / QR ke Google Sheet</h2>
-  <div id="reader" style="width:320px; margin:auto; border:2px solid #333; border-radius:10px;"></div>
+  <div id="reader" style="width:100%; height:50vh; margin:auto; border:2px solid #333; border-radius:10px;"></div>
   <p id="status" style="margin-top:15px; font-weight:bold; color:green;">Siap scan...</p>
 
   <!-- 🔊 Suara OK -->
@@ -25,15 +25,15 @@
       fetch(sheetURL + "?kode=" + encodeURIComponent(code))
         .then(r => r.text())
         .then(res => {
-          document.getElementById("status").innerText = "✅ Data terkirim: " + code;
+          document.getElementById("status").innerText = "✅" + code;
           beep.play(); // 🔊 bunyi saat berhasil
-          // aktifkan lagi scanner setelah 2 detik
+          // aktifkan lagi scanner setelah 2 detik 2000
           setTimeout(() => {
             document.getElementById("status").innerText = "Siap scan lagi...";
             html5QrcodeScanner.clear().then(() => {
               html5QrcodeScanner.render(onScanSuccess);
             });
-          }, 500);
+          }, 2000);
         })
         .catch(err => {
           document.getElementById("status").innerText = "❌ Gagal kirim data!";
@@ -42,17 +42,18 @@
 
     function onScanSuccess(decodedText, decodedResult) {
       // Stop sementara agar tidak double input
-      html5QrcodeScanner.clear();
-      sendToSheet(decodedText);
+     // html5QrcodeScanner.clear();
+    //  sendToSheet(decodedText);
     }
 
     // Start scanner
     let html5QrcodeScanner = new Html5QrcodeScanner(
-      "reader", { fps: 30, qrbox: 250 });
+      "reader", { fps: 10, qrbox: 250 });
     html5QrcodeScanner.render(onScanSuccess);
   </script>
 </body>
 </html>
+
 
 
 
