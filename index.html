@@ -23,9 +23,10 @@
       transform: translateX(-50%);
       background: rgba(0,0,0,0.7);
       color: #0f0;
-      padding: 8px 15px;
-      border-radius: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
       font-weight: bold;
+      font-size: 20px;
     }
   </style>
 </head>
@@ -40,32 +41,33 @@
   </audio>
 
   <script>
-    // 🔗 Ganti dengan URL Web App dari Google Apps Script
+    // 🔗 URL Web App Google Apps Script
     const sheetURL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
     const beep = document.getElementById("beepSound");
+    const statusText = document.getElementById("status");
 
     function sendToSheet(code) {
+      statusText.innerText = "⏳ Mengirim...";
+      statusText.style.color = "#ff0"; // kuning saat kirim
+
       fetch(sheetURL + "?kode=" + encodeURIComponent(code))
         .then(r => r.text())
         .then(res => {
-          document.getElementById("status").innerText = "✅ " + code;
-          beep.play(); // 🔊 bunyi saat berhasil
-          // aktifkan lagi scanner setelah 2 detik
-          setTimeout(() => {
-            document.getElementById("status").innerText = "📷 Siap scan lagi...";
-            html5QrcodeScanner.clear().then(() => {
-              html5QrcodeScanner.render(onScanSuccess);
-            });
-          }, 2000);
+          statusText.innerText = "✅ " + code;
+          statusText.style.color = "#0f0"; // hijau sukses
+          beep.play(); // bunyi beep
+          // langsung aktif lagi tanpa delay
+          html5QrcodeScanner.render(onScanSuccess);
         })
         .catch(err => {
-          document.getElementById("status").innerText = "❌ Gagal kirim data!";
+          statusText.innerText = "❌ Gagal kirim data!";
+          statusText.style.color = "#f00"; // merah error
+          html5QrcodeScanner.render(onScanSuccess);
         });
     }
 
     function onScanSuccess(decodedText, decodedResult) {
-      // Stop sementara agar tidak double input
-      html5QrcodeScanner.clear();
+      html5QrcodeScanner.clear(); // pause dulu
       sendToSheet(decodedText);
     }
 
