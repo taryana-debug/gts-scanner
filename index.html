@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Scanner ke Google Sheet (Offline Buffer + Anti Duplikat)</title>
+  <title>Scanner ke Google Sheet (Auto Reset Kasir Mode)</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body style="font-family:sans-serif; text-align:center; padding:20px; background:#f8f9fa;">
@@ -17,22 +17,18 @@
   </audio>
 
   <script>
-    // URL Google Apps Script Web App (ganti dengan URL kamu)
     const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
     const okSound = document.getElementById("okSound");
 
-    // Anti duplikat
     let lastScan = "";
     let lastTime = 0;
 
-    // Simpan data scan ke localStorage
     function saveToLocalStorage(code) {
       let data = JSON.parse(localStorage.getItem("scannedData") || "[]");
       data.push({ code: code, time: new Date().toISOString() });
       localStorage.setItem("scannedData", JSON.stringify(data));
     }
 
-    // Coba kirim data di buffer ke Google Sheet
     function syncData() {
       let data = JSON.parse(localStorage.getItem("scannedData") || "[]");
       if (data.length === 0) return;
@@ -45,36 +41,42 @@
           data.shift();
           localStorage.setItem("scannedData", JSON.stringify(data));
         })
-        .catch(err => {
-          console.error("Error sync:", err);
-        });
+        .catch(err => console.error("Error sync:", err));
     }
 
-    function onScanSuccess(decodedText) {
-      const now = Date.now();
-      if (decodedText === lastScan && (now - lastTime) < 3000) {
-        return; // abaikan duplikat dalam 3 detik
-      }
+    const html5QrCode = new Html5Qrcode("reader");
 
-      lastScan = decodedText;
-      lastTime = now;
+    function startScanner() {
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          const now = Date.now();
+          if (decodedText === lastScan && (now - lastTime) < 1000) {
+            return; // abaikan duplikat 1 detik
+          }
+          lastScan = decodedText;
+          lastTime = now;
 
-      document.getElementById("result").textContent = decodedText;
-      okSound.play();
+          document.getElementById("result").textContent = decodedText;
+          okSound.play();
 
-      saveToLocalStorage(decodedText);
-      syncData();
+          saveToLocalStorage(decodedText);
+          syncData();
+
+          // Stop sebentar lalu restart scanner biar siap scan lagi
+          html5QrCode.stop().then(() => {
+            setTimeout(() => startScanner(), 800); // restart setelah 0.8 detik
+          });
+        },
+        (errorMessage) => {
+          // error scanning diabaikan
+        }
+      );
     }
 
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-      "reader", { fps: 10, qrbox: 250 }
-    );
-    html5QrcodeScanner.render(onScanSuccess);
-
-    //setInterval(syncData, 5000);
+    startScanner();
+    setInterval(syncData, 5000);
   </script>
 </body>
 </html>
-
-
-
