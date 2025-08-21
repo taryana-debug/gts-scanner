@@ -1,90 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Scanner ke Google Sheet (Poka-Yoke Permanent)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Scanner Poka-Yoke</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background: #000; color:#fff; }
+    #reader { width: 100%; height: 60vh; margin: auto; }
+    #result { font-size: 22px; margin-top: 15px; font-weight: bold; }
+    #history { margin-top: 20px; max-height: 200px; overflow-y: auto; background:#111; padding:10px; border-radius:8px; text-align:left; }
+    #history h3 { margin:0 0 10px 0; font-size:18px; }
+    #history ul { list-style:none; padding:0; margin:0; }
+    #history li { padding:4px 0; border-bottom:1px solid #333; font-size:16px; }
+  </style>
 </head>
-<body style="font-family:sans-serif; text-align:center; padding:20px; background:#f8f9fa;">
+<body>
+  <h2>QR Scanner dengan Poka-Yoke</h2>
+  <div id="reader"></div>
+  <div id="result">Hasil scan akan muncul di sini</div>
 
-  <h2>📷 QR / Barcode Scanner</h2>
-  <div id="reader" style="width:100%; margin:auto;"></div>
-  <p style="margin-top:20px; font-size:18px;">Hasil Scan: <span id="result">-</span></p>
-
-  <!-- Suara OK -->
-  <audio id="okSound">
-    <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
-  </audio>
-  <!-- Suara Error -->
-  <audio id="errorSound">
-    <source src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" type="audio/ogg">
-  </audio>
+  <div id="history">
+    <h3>Riwayat Scan</h3>
+    <ul id="scanList"></ul>
+  </div>
 
   <script>
-    const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
-    const okSound = document.getElementById("okSound");
-    const errorSound = document.getElementById("errorSound");
+  const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
 
-    // Simpan semua kode yang sudah pernah discan (poka-yoke)
-    let scannedCodes = JSON.parse(localStorage.getItem("scannedCodes") || "[]");
+  let scannedCodes = JSON.parse(localStorage.getItem("scannedCodes") || "[]");
+  let isProcessing = false;
+  let isSyncing = false;
 
-    function saveToLocalStorage(code) {
-      let data = JSON.parse(localStorage.getItem("scannedData") || "[]");
-      data.push({ code: code, time: new Date().toISOString() });
-      localStorage.setItem("scannedData", JSON.stringify(data));
-    }
+  // Suara
+  const okSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+  const errorSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
 
-    function syncData() {
-      let data = JSON.parse(localStorage.getItem("scannedData") || "[]");
-      if (data.length === 0) return;
+  const html5QrCode = new Html5Qrcode("reader");
 
-      const item = data[0];
-      fetch(SHEET_URL + "?kode=" + encodeURIComponent(item.code))
-        .then(res => res.text())
-        .then(txt => {
-          console.log("Respon server:", txt);
-          data.shift();
-          localStorage.setItem("scannedData", JSON.stringify(data));
-        })
-        .catch(err => console.error("Error sync:", err));
-    }
+  function updateHistory(newCode) {
+    const scanList = document.getElementById("scanList");
+    const li = document.createElement("li");
+    li.textContent = `${new Date().toLocaleTimeString()} → ${newCode}`;
+    scanList.prepend(li);
+  }
 
-    const html5QrCode = new Html5Qrcode("reader");
+  function onScanSuccess(decodedText) {
+    if (isProcessing) return;
+    isProcessing = true;
 
-    function startScanner() {
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        (decodedText) => {
-          if (scannedCodes.includes(decodedText)) {
-            console.log("Kode sudah pernah discan, abaikan.");
-            errorSound.play();
-            return; // poka-yoke permanent
-          }
+    html5QrCode.stop().then(() => {
+      // Poka-yoke permanent
+      if (scannedCodes.includes(decodedText)) {
+        errorSound.play();
+        console.log("Kode sudah pernah dipakai:", decodedText);
+        isProcessing = false;
+        restartScanner();
+        return;
+      }
 
-          // Simpan kode baru ke daftar poka-yoke
-          scannedCodes.push(decodedText);
-          localStorage.setItem("scannedCodes", JSON.stringify(scannedCodes));
+      // Simpan ke history poka-yoke
+      scannedCodes.push(decodedText);
+      localStorage.setItem("scannedCodes", JSON.stringify(scannedCodes));
 
-          document.getElementById("result").textContent = decodedText;
-          okSound.play();
+      document.getElementById("result").textContent = decodedText;
+      okSound.play();
+      updateHistory(decodedText);
 
-          saveToLocalStorage(decodedText);
-          syncData();
+      // Simpan ke buffer sync
+      saveToBuffer(decodedText);
+      syncData();
 
-          // Stop sebentar lalu restart scanner
-          html5QrCode.stop().then(() => {
-            setTimeout(() => startScanner(), 800);
-          });
-        },
-        (errorMessage) => {
-          // abaikan error
-        }
-      );
-    }
+      // Reset scanner biar siap lagi
+      setTimeout(() => {
+        isProcessing = false;
+        restartScanner();
+      }, 800);
+    });
+  }
 
-    startScanner();
-    setInterval(syncData, 5000);
+  function restartScanner() {
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10 }, // Fullscreen (tanpa qrbox)
+      onScanSuccess
+    );
+  }
+
+  function saveToBuffer(code) {
+    let buffer = JSON.parse(localStorage.getItem("scannedData") || "[]");
+    buffer.push({ code, time: new Date().toISOString() });
+    localStorage.setItem("scannedData", JSON.stringify(buffer));
+  }
+
+  function syncData() {
+    if (isSyncing) return;
+    let buffer = JSON.parse(localStorage.getItem("scannedData") || "[]");
+    if (buffer.length === 0) return;
+
+    isSyncing = true;
+    let item = buffer[0];
+
+    fetch(SHEET_URL + "?kode=" + encodeURIComponent(item.code))
+      .then(res => res.text())
+      .then(txt => {
+        console.log("Respon server:", txt);
+        buffer.shift(); // hapus data yg sudah terkirim
+        localStorage.setItem("scannedData", JSON.stringify(buffer));
+        isSyncing = false;
+
+        if (buffer.length > 0) syncData(); // lanjutkan sisa buffer
+      })
+      .catch(err => {
+        console.error("Error sync:", err);
+        isSyncing = false;
+      });
+  }
+
+  setInterval(syncData, 5000);
+
+  // Start scanner saat load
+  restartScanner();
   </script>
 </body>
 </html>
