@@ -7,16 +7,21 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; background: #000; color:#fff; }
-    #reader { width: 100%; height: 30vh; margin: auto; } /* kamera setengah layar hp */
+    #reader { width: 50%; height: 50vh; margin: auto; } /* kamera setengah layar hp */
     #result { font-size: 22px; margin-top: 15px; font-weight: bold; }
     #history { margin-top: 20px; max-height: 200px; overflow-y: auto; background:#111; padding:10px; border-radius:8px; text-align:left; }
     #history h3 { margin:0 0 10px 0; font-size:18px; display:flex; justify-content:space-between; align-items:center; }
     #history ul { list-style:none; padding:0; margin:0; }
     #history li { padding:4px 0; border-bottom:1px solid #333; font-size:16px; }
+    button { margin:10px; padding:10px 20px; border:none; border-radius:8px; background:#ff4444; color:#fff; font-size:16px; cursor:pointer; }
   </style>
 </head>
 <body>
   <h2>QR Scanner dengan Poka-Yoke</h2>
+  <div style="margin:10px 0">
+    <button onclick="resetPokaYoke()" style="background:#444; color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">Reset Poka‑Yoke</button>
+    <small style="display:block; color:#aaa; margin-top:6px;">Reset ini hanya menghapus daftar kode yang sudah pernah discan di perangkat ini (localStorage). Data di Google Sheet tidak berubah.</small>
+  </div>
   <div id="reader"></div>
   <div id="result">Hasil scan akan muncul di sini</div>
 
@@ -26,6 +31,8 @@
     </h3>
     <ul id="scanList"></ul>
   </div>
+
+  <button onclick="resetPokaYoke()">🔄 Reset Poka-Yoke</button>
 
   <script>
   const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
@@ -119,23 +126,23 @@
       });
   }
 
-  // Clear otomatis di Google Sheet saja (tanpa tombol di UI)
-  function clearSheet() {
-    fetch(SHEET_URL + "?clear=1")
-      .then(res => res.text())
-      .then(txt => {
-        console.log("Sheet cleared:", txt);
-      });
+  function resetPokaYoke() {
+    localStorage.removeItem("scannedCodes");
+    scannedCodes = [];
+    alert("✅ Poka-Yoke telah di-reset. Semua kode bisa discan ulang.");
   }
 
   setInterval(syncData, 5000);
 
-  // contoh: panggil clearSheet() saat halaman load (kalau memang mau selalu kosong diawal)
-  // clearSheet();
-
   // Start scanner saat load
   restartScanner();
+  // Reset Poka-Yoke: hapus daftar kode yang pernah discan di perangkat ini
+  function resetPokaYoke() {
+    localStorage.removeItem('scannedCodes');
+    scannedCodes = [];
+    console.log('Poka-Yoke direset di perangkat ini');
+    alert('Poka‑Yoke direset. Kode yang pernah discan bisa dipakai lagi di perangkat ini.');
+  }
   </script>
 </body>
 </html>
-
