@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Scanner ke Google Sheet (Auto Reset Kasir Mode)</title>
+  <title>Scanner ke Google Sheet (Poka-Yoke Permanent)</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body style="font-family:sans-serif; text-align:center; padding:20px; background:#f8f9fa;">
@@ -15,13 +15,18 @@
   <audio id="okSound">
     <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
   </audio>
+  <!-- Suara Error -->
+  <audio id="errorSound">
+    <source src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" type="audio/ogg">
+  </audio>
 
   <script>
     const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
     const okSound = document.getElementById("okSound");
+    const errorSound = document.getElementById("errorSound");
 
-    let lastScan = "";
-    let lastTime = 0;
+    // Simpan semua kode yang sudah pernah discan (poka-yoke)
+    let scannedCodes = JSON.parse(localStorage.getItem("scannedCodes") || "[]");
 
     function saveToLocalStorage(code) {
       let data = JSON.parse(localStorage.getItem("scannedData") || "[]");
@@ -51,12 +56,15 @@
         { facingMode: "environment" },
         { fps: 10, qrbox: 250 },
         (decodedText) => {
-          const now = Date.now();
-          if (decodedText === lastScan && (now - lastTime) < 1000) {
-            return; // abaikan duplikat 1 detik
+          if (scannedCodes.includes(decodedText)) {
+            console.log("Kode sudah pernah discan, abaikan.");
+            errorSound.play();
+            return; // poka-yoke permanent
           }
-          lastScan = decodedText;
-          lastTime = now;
+
+          // Simpan kode baru ke daftar poka-yoke
+          scannedCodes.push(decodedText);
+          localStorage.setItem("scannedCodes", JSON.stringify(scannedCodes));
 
           document.getElementById("result").textContent = decodedText;
           okSound.play();
@@ -64,13 +72,13 @@
           saveToLocalStorage(decodedText);
           syncData();
 
-          // Stop sebentar lalu restart scanner biar siap scan lagi
+          // Stop sebentar lalu restart scanner
           html5QrCode.stop().then(() => {
-            setTimeout(() => startScanner(), 800); // restart setelah 0.8 detik
+            setTimeout(() => startScanner(), 800);
           });
         },
         (errorMessage) => {
-          // error scanning diabaikan
+          // abaikan error
         }
       );
     }
