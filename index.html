@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Scanner ke Google Sheet (Offline Buffer)</title>
+  <title>Scanner ke Google Sheet (Offline Buffer + Anti Duplikat)</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body style="font-family:sans-serif; text-align:center; padding:20px; background:#f8f9fa;">
@@ -21,6 +21,10 @@
     const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
     const okSound = document.getElementById("okSound");
 
+    // Anti duplikat
+    let lastScan = "";
+    let lastTime = 0;
+
     // Simpan data scan ke localStorage
     function saveToLocalStorage(code) {
       let data = JSON.parse(localStorage.getItem("scannedData") || "[]");
@@ -33,13 +37,11 @@
       let data = JSON.parse(localStorage.getItem("scannedData") || "[]");
       if (data.length === 0) return;
 
-      // Ambil 1 data pertama
       const item = data[0];
       fetch(SHEET_URL + "?kode=" + encodeURIComponent(item.code))
         .then(res => res.text())
         .then(txt => {
           console.log("Respon server:", txt);
-          // Hapus data yang sudah terkirim
           data.shift();
           localStorage.setItem("scannedData", JSON.stringify(data));
         })
@@ -49,24 +51,29 @@
     }
 
     function onScanSuccess(decodedText) {
+      const now = Date.now();
+      if (decodedText === lastScan && (now - lastTime) < 3000) {
+        return; // abaikan duplikat dalam 3 detik
+      }
+
+      lastScan = decodedText;
+      lastTime = now;
+
       document.getElementById("result").textContent = decodedText;
       okSound.play();
 
-      // simpan ke localStorage dulu
       saveToLocalStorage(decodedText);
-
-      // langsung coba sync
       syncData();
     }
 
-    // inisialisasi scanner
     const html5QrcodeScanner = new Html5QrcodeScanner(
       "reader", { fps: 10, qrbox: 250 }
     );
     html5QrcodeScanner.render(onScanSuccess);
 
-    // auto sync setiap 5 detik
     setInterval(syncData, 5000);
   </script>
 </body>
 </html>
+
+
