@@ -7,7 +7,7 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; background: #000; color:#fff; }
-    #reader { width: 50%; height: 50vh; margin: auto; } /* kamera setengah layar hp */
+    #reader { width: 100%; height: 50vh; margin: auto; } /* kamera setengah layar hp */
     #result { font-size: 22px; margin-top: 15px; font-weight: bold; }
     #history { margin-top: 20px; max-height: 200px; overflow-y: auto; background:#111; padding:10px; border-radius:8px; text-align:left; }
     #history h3 { margin:0 0 10px 0; font-size:18px; display:flex; justify-content:space-between; align-items:center; }
@@ -31,8 +31,6 @@
     </h3>
     <ul id="scanList"></ul>
   </div>
-
-  <button onclick="resetPokaYoke()">🔄 Reset Poka-Yoke</button>
 
   <script>
   const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
@@ -136,13 +134,6 @@
 
   // Start scanner saat load
   restartScanner();
-  // Reset Poka-Yoke: hapus daftar kode yang pernah discan di perangkat ini
-  function resetPokaYoke() {
-    localStorage.removeItem('scannedCodes');
-    scannedCodes = [];
-    console.log('Poka-Yoke direset di perangkat ini');
-    alert('Poka‑Yoke direset. Kode yang pernah discan bisa dipakai lagi di perangkat ini.');
-  }
   </script>
 </body>
 </html>
