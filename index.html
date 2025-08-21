@@ -13,7 +13,6 @@
     #history h3 { margin:0 0 10px 0; font-size:18px; display:flex; justify-content:space-between; align-items:center; }
     #history ul { list-style:none; padding:0; margin:0; }
     #history li { padding:4px 0; border-bottom:1px solid #333; font-size:16px; }
-    button { background:#c00; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -24,7 +23,6 @@
   <div id="history">
     <h3>
       Riwayat Scan
-      <button onclick="clearHistory()">Clear</button>
     </h3>
     <ul id="scanList"></ul>
   </div>
@@ -121,15 +119,19 @@
       });
   }
 
-  function clearHistory() {
-    document.getElementById("scanList").innerHTML = "";
-    scannedCodes = [];
-    localStorage.setItem("scannedCodes", JSON.stringify(scannedCodes));
-    localStorage.setItem("scannedData", JSON.stringify([]));
-    document.getElementById("result").textContent = "Hasil scan akan muncul di sini";
+  // Clear otomatis di Google Sheet saja (tanpa tombol di UI)
+  function clearSheet() {
+    fetch(SHEET_URL + "?clear=1")
+      .then(res => res.text())
+      .then(txt => {
+        console.log("Sheet cleared:", txt);
+      });
   }
 
   setInterval(syncData, 5000);
+
+  // contoh: panggil clearSheet() saat halaman load (kalau memang mau selalu kosong diawal)
+  // clearSheet();
 
   // Start scanner saat load
   restartScanner();
