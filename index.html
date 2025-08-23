@@ -7,12 +7,12 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; background: #000; color:#fff; }
-    #reader { width: 100%; height: 50vh; margin: auto; } /* kamera setengah layar hp */
+    #reader { width: 320px; height: 240px; margin: auto; border:2px solid #444; border-radius:8px; }
     #result { font-size: 22px; margin-top: 15px; font-weight: bold; }
-    #history { margin-top: 20px; max-height: 200px; overflow-y: auto; background:#111; padding:10px; border-radius:8px; text-align:left; }
-    #history h3 { margin:0 0 10px 0; font-size:18px; display:flex; justify-content:space-between; align-items:center; }
-    #history ul { list-style:none; padding:0; margin:0; }
-    #history li { padding:4px 0; border-bottom:1px solid #333; font-size:16px; }
+    #tableContainer { margin-top:20px; background:#111; padding:10px; border-radius:8px; }
+    table { width:100%; border-collapse: collapse; color:#fff; }
+    th, td { border:1px solid #333; padding:6px; text-align:center; }
+    th { background:#222; }
     button { margin:10px; padding:10px 20px; border:none; border-radius:8px; background:#ff4444; color:#fff; font-size:16px; cursor:pointer; }
   </style>
 </head>
@@ -20,36 +20,44 @@
   <h2>QR Scanner dengan Poka-Yoke</h2>
   <div style="margin:10px 0">
     <button onclick="resetPokaYoke()" style="background:#444; color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">Reset Poka‑Yoke</button>
-    <small style="display:block; color:#aaa; margin-top:6px;">Reset ini hanya menghapus daftar kode yang sudah pernah discan di perangkat ini (localStorage). Data di Google Sheet tidak berubah.</small>
   </div>
   <div id="reader"></div>
   <div id="result">Hasil scan akan muncul di sini</div>
 
-  <div id="history">
-    <h3>
-      Riwayat Scan
-    </h3>
-    <ul id="scanList"></ul>
+  <div id="tableContainer">
+    <h3>Data Scan</h3>
+    <table>
+      <thead>
+        <tr><th>Part No</th><th>Qty</th></tr>
+      </thead>
+      <tbody id="scanTable"></tbody>
+    </table>
   </div>
 
   <script>
   const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
 
-  let scannedCodes = JSON.parse(localStorage.getItem("scannedCodes") || "[]");
+  let scannedData = JSON.parse(localStorage.getItem("scannedDataTable") || "{}");
   let isProcessing = false;
-  let isSyncing = false;
 
-  // Suara
   const okSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
   const errorSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
 
   const html5QrCode = new Html5Qrcode("reader");
 
-  function updateHistory(newCode) {
-    const scanList = document.getElementById("scanList");
-    const li = document.createElement("li");
-    li.textContent = `${new Date().toLocaleTimeString()} → ${newCode}`;
-    scanList.prepend(li);
+  function renderTable() {
+    const tbody = document.getElementById("scanTable");
+    tbody.innerHTML = "";
+    Object.keys(scannedData).forEach(code => {
+      const tr = document.createElement("tr");
+      const tdPart = document.createElement("td");
+      const tdQty = document.createElement("td");
+      tdPart.textContent = code;
+      tdQty.textContent = scannedData[code];
+      tr.appendChild(tdPart);
+      tr.appendChild(tdQty);
+      tbody.appendChild(tr);
+    });
   }
 
   function onScanSuccess(decodedText) {
@@ -57,28 +65,20 @@
     isProcessing = true;
 
     html5QrCode.stop().then(() => {
-      // Poka-yoke permanent
-      if (scannedCodes.includes(decodedText)) {
-        errorSound.play();
-        console.log("Kode sudah pernah dipakai:", decodedText);
-        isProcessing = false;
-        restartScanner();
-        return;
+      let part = decodedText.split(";")[0];
+
+      if (scannedData[part]) {
+        scannedData[part] += 1;
+      } else {
+        scannedData[part] = 1;
       }
 
-      // Simpan ke history poka-yoke
-      scannedCodes.push(decodedText);
-      localStorage.setItem("scannedCodes", JSON.stringify(scannedCodes));
+      localStorage.setItem("scannedDataTable", JSON.stringify(scannedData));
 
       document.getElementById("result").textContent = decodedText;
       okSound.play();
-      updateHistory(decodedText);
+      renderTable();
 
-      // Simpan ke buffer sync
-      saveToBuffer(decodedText);
-      syncData();
-
-      // Reset scanner biar siap lagi
       setTimeout(() => {
         isProcessing = false;
         restartScanner();
@@ -89,51 +89,22 @@
   function restartScanner() {
     html5QrCode.start(
       { facingMode: "environment" },
-      { fps: 10 }, // Fullscreen (tanpa qrbox)
+      { fps: 10, qrbox: { width: 250, height: 250 } },
       onScanSuccess
     );
   }
 
-  function saveToBuffer(code) {
-    let buffer = JSON.parse(localStorage.getItem("scannedData") || "[]");
-    buffer.push({ code, time: new Date().toISOString() });
-    localStorage.setItem("scannedData", JSON.stringify(buffer));
-  }
-
-  function syncData() {
-    if (isSyncing) return;
-    let buffer = JSON.parse(localStorage.getItem("scannedData") || "[]");
-    if (buffer.length === 0) return;
-
-    isSyncing = true;
-    let item = buffer[0];
-
-    fetch(SHEET_URL + "?kode=" + encodeURIComponent(item.code))
-      .then(res => res.text())
-      .then(txt => {
-        console.log("Respon server:", txt);
-        buffer.shift(); // hapus data yg sudah terkirim
-        localStorage.setItem("scannedData", JSON.stringify(buffer));
-        isSyncing = false;
-
-        if (buffer.length > 0) syncData(); // lanjutkan sisa buffer
-      })
-      .catch(err => {
-        console.error("Error sync:", err);
-        isSyncing = false;
-      });
-  }
-
   function resetPokaYoke() {
-    localStorage.removeItem("scannedCodes");
-    scannedCodes = [];
-    alert("✅ Poka-Yoke telah di-reset. Semua kode bisa discan ulang.");
+    localStorage.removeItem("scannedDataTable");
+    scannedData = {};
+    renderTable();
+    alert("✅ Data scan direset.");
   }
 
-  setInterval(syncData, 5000);
-
-  // Start scanner saat load
+  // Start scanner
+  renderTable();
   restartScanner();
   </script>
 </body>
 </html>
+
