@@ -28,7 +28,7 @@
     <h3>Data Scan</h3>
     <table>
       <thead>
-        <tr><th>Part No</th><th>Qty</th></tr>
+        <tr><th>Barcode</th><th>Qty</th></tr>
       </thead>
       <tbody id="scanTable"></tbody>
     </table>
@@ -49,22 +49,22 @@
   function renderTable() {
     const tbody = document.getElementById("scanTable");
     tbody.innerHTML = "";
-    Object.keys(scannedData).sort().forEach(code => {
+    Object.keys(scannedData).forEach(code => {
       const tr = document.createElement("tr");
-      const tdPart = document.createElement("td");
+      const tdCode = document.createElement("td");
       const tdQty = document.createElement("td");
-      tdPart.textContent = code;
+      tdCode.textContent = code;
       tdQty.textContent = scannedData[code];
-      tr.appendChild(tdPart);
+      tr.appendChild(tdCode);
       tr.appendChild(tdQty);
       tbody.appendChild(tr);
     });
   }
 
-  async function sendToSheet(part, qty) {
+  async function sendToSheet(barcode, qty) {
     try {
-      // Kirim via GET sesuai doGet(e)
-      const url = `${SHEET_URL}?kode=${encodeURIComponent(part)}&qty=${qty}`;
+      // Kirim seluruh barcode dan qty
+      const url = `${SHEET_URL}?kode=${encodeURIComponent(barcode)}&qty=${qty}`;
       await fetch(url, { method: "GET", mode: "no-cors" });
     } catch (e) {
       console.error("Gagal kirim ke Sheet:", e);
@@ -75,8 +75,8 @@
     if (isProcessing) return;
     isProcessing = true;
 
-    const part = (decodedText || "").split(";")[0].trim();
-    if (!part) {
+    const barcode = (decodedText || "").trim();
+    if (!barcode) {
       errorSound.play();
       document.getElementById("result").textContent = "Barcode tidak valid";
       isProcessing = false;
@@ -84,15 +84,15 @@
     }
 
     html5QrCode.stop().then(async () => {
-      scannedData[part] = (scannedData[part] || 0) + 1;
+      scannedData[barcode] = (scannedData[barcode] || 0) + 1;
       localStorage.setItem("scannedDataTable", JSON.stringify(scannedData));
 
-      document.getElementById("result").textContent = `Scan: ${part} | Qty total: ${scannedData[part]}`;
+      document.getElementById("result").textContent = `Scan: ${barcode} | Qty total: ${scannedData[barcode]}`;
       okSound.play();
       renderTable();
 
-      // Kirim ke Google Sheet
-      sendToSheet(part, scannedData[part]);
+      // Kirim semua data barcode ke Google Sheet
+      sendToSheet(barcode, scannedData[barcode]);
 
       setTimeout(() => {
         isProcessing = false;
