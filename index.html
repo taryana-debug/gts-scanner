@@ -28,14 +28,13 @@
     <h3>Data Scan</h3>
     <table>
       <thead>
-        <tr><th>Barcode</th><th>Qty</th></tr>
+        <tr><th>Part No</th><th>Qty</th></tr>
       </thead>
       <tbody id="scanTable"></tbody>
     </table>
   </div>
 
   <script>
-  // Ganti ke URL Apps Script kamu (doGet)
   const SHEET_URL = "https://script.google.com/macros/s/AKfycbwPZRWHrCxkoF11VHQMweNM8CXr5bWKN4ezJOMSTN8u9rjtqcWwwdM6VJvCILW8SR7M9A/exec";
 
   let scannedData = JSON.parse(localStorage.getItem("scannedDataTable") || "{}");
@@ -53,8 +52,11 @@
       const tr = document.createElement("tr");
       const tdCode = document.createElement("td");
       const tdQty = document.createElement("td");
-      tdCode.textContent = code;
+
+      // Tampilkan hanya Part No (sebelum tanda ";") di tabel
+      tdCode.textContent = code.split(";")[0];
       tdQty.textContent = scannedData[code];
+
       tr.appendChild(tdCode);
       tr.appendChild(tdQty);
       tbody.appendChild(tr);
@@ -63,7 +65,6 @@
 
   async function sendToSheet(barcode, qty) {
     try {
-      // Kirim seluruh barcode dan qty
       const url = `${SHEET_URL}?kode=${encodeURIComponent(barcode)}&qty=${qty}`;
       await fetch(url, { method: "GET", mode: "no-cors" });
     } catch (e) {
@@ -87,11 +88,12 @@
       scannedData[barcode] = (scannedData[barcode] || 0) + 1;
       localStorage.setItem("scannedDataTable", JSON.stringify(scannedData));
 
-      document.getElementById("result").textContent = `Scan: ${barcode} | Qty total: ${scannedData[barcode]}`;
+      // Tampilkan hanya Part No di layar, Qty total dihitung
+      document.getElementById("result").textContent = `Scan: ${barcode.split(";")[0]} | Qty total: ${scannedData[barcode]}`;
       okSound.play();
       renderTable();
 
-      // Kirim semua data barcode ke Google Sheet
+      // Kirim seluruh barcode (utuh) + qty ke Google Sheet
       sendToSheet(barcode, scannedData[barcode]);
 
       setTimeout(() => {
